@@ -460,6 +460,34 @@ body {
 .callout-caution   { background: #fde7e9; border-color: #f8bdc0; border-left-color: #d13438; }
 .callout-caution   .callout-title { color: #a4262c; }
 
+/* ── Authoring errors (mis-formatted callouts, etc.) ────── */
+.authoring-error {
+  background: #fff8e1;
+  border: 1px solid #ffe082;
+  border-left: 4px solid #f9a825;
+  border-radius: 4px;
+  padding: 0.85rem 1.1rem;
+  margin: 1.25rem 0;
+  font-size: 0.875rem;
+}
+.authoring-error-title {
+  font-weight: 700;
+  margin: 0 0 0.4rem;
+  color: #7a4f00;
+}
+.authoring-error p { margin: 0.25rem 0; color: #5a3a00; }
+.authoring-error pre {
+  background: #fff3cd;
+  border: 1px solid #ffe082;
+  border-radius: 3px;
+  padding: 0.5rem 0.75rem;
+  margin: 0.5rem 0 0;
+  font-size: 0.8125rem;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+.authoring-error code { background: none; padding: 0; }
+
 /* ── Status states ───────────────────────────────────────── */
 
 .loading-state {

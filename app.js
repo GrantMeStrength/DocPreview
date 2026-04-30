@@ -155,6 +155,7 @@
    * into  <div class="callout callout-note">…</div>
    */
   function postProcessCallouts(container) {
+    // ── Correctly formatted: > [!NOTE] inside a blockquote ──────
     container.querySelectorAll('blockquote').forEach(bq => {
       const firstP = bq.querySelector('p:first-child');
       if (!firstP) return;
@@ -192,6 +193,25 @@
       });
 
       bq.replaceWith(div);
+    });
+
+    // ── Mis-formatted: [!NOTE] outside a blockquote (missing ">") ──
+    const CALLOUT_RE = /^\[!(NOTE|TIP|WARNING|IMPORTANT|CAUTION)\]/i;
+    container.querySelectorAll('p').forEach(p => {
+      // Skip paragraphs already inside a processed callout div
+      if (p.closest('.callout')) return;
+      const match = p.textContent.trim().match(CALLOUT_RE);
+      if (!match) return;
+
+      const type  = match[1].toUpperCase();
+      const raw   = p.textContent.trim();
+      const div   = document.createElement('div');
+      div.className = 'authoring-error';
+      div.innerHTML =
+        `<p class="authoring-error-title">⚠️ Authoring error — missing <code>&gt;</code> prefix</p>` +
+        `<p>This callout was written as plain text instead of a blockquote. Change it to:</p>` +
+        `<pre><code>&gt; [!${escapeHtml(type)}]\n&gt; ${escapeHtml(raw.replace(CALLOUT_RE, '').trim())}</code></pre>`;
+      p.replaceWith(div);
     });
   }
 
