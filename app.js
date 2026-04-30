@@ -450,6 +450,20 @@
     }, 60);
   }
 
+  // ── Broken image placeholders ────────────────────────────────
+  function addImagePlaceholders(container) {
+    container.querySelectorAll('img').forEach(img => {
+      img.addEventListener('error', () => {
+        const label = img.alt || img.src.split('/').pop() || 'image';
+        const span  = document.createElement('span');
+        span.className   = 'img-placeholder';
+        span.textContent = label;
+        span.title       = img.src;
+        img.replaceWith(span);
+      }, { once: true });
+    });
+  }
+
   // ── Shared render function ───────────────────────────────────
   /**
    * Parse, sanitize, and render markdown into contentArea.
@@ -472,6 +486,8 @@
 
     if (rawUrl)       rewriteRelativeUrls(contentArea, rawUrl);
     if (localRelPath) postProcessLocalUrls(contentArea, localRelPath);
+
+    addImagePlaceholders(contentArea);
 
     buildTOC(contentArea);
     addCopyButtons(contentArea);

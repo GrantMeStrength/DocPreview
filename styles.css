@@ -581,6 +581,41 @@ body {
   margin-top: 0.75rem;
 }
 
+.welcome-note {
+  color: #6b4c00;
+  background: #fff8e1;
+  border: 1px solid #ffe082;
+  border-radius: 4px;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem !important;
+  margin-top: 0.5rem;
+}
+
+/* ── Broken image placeholder ────────────────────────────── */
+
+.img-placeholder {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4em;
+  background: var(--color-bg-alt);
+  border: 1px dashed var(--color-border);
+  border-radius: 4px;
+  padding: 0.3em 0.6em;
+  font-size: 0.8125rem;
+  color: var(--color-muted);
+  font-family: var(--font-mono);
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+.img-placeholder::before {
+  content: '🖼';
+  flex-shrink: 0;
+}
+
 /* ── Header: separator + Browse button ──────────────────── */
 
 .header-sep {
