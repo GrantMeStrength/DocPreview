@@ -442,8 +442,9 @@ body {
   gap: 0.4rem;
 }
 
-.callout-note      { background: #eff6fc; border-color: #cde0f5; border-left-color: #0078d4; }
-.callout-note      .callout-title { color: #004e8c; }
+/* NOTE: purple/lavender — matches learn.microsoft.com */
+.callout-note      { background: #f0ecfb; border-color: #c9b3ef; border-left-color: #7b4db7; }
+.callout-note      .callout-title { color: #5c2d91; }
 
 .callout-tip       { background: #e6f5e6; border-color: #b8deb8; border-left-color: #107c10; }
 .callout-tip       .callout-title { color: #0a5d0a; }
@@ -451,8 +452,9 @@ body {
 .callout-warning   { background: #fff4ce; border-color: #f5d76e; border-left-color: #f7630c; }
 .callout-warning   .callout-title { color: #c05400; }
 
-.callout-important { background: #f4f0ff; border-color: #d5c9f8; border-left-color: #8764b8; }
-.callout-important .callout-title { color: #5c2d91; }
+/* IMPORTANT: blue — informational, distinct from NOTE */
+.callout-important { background: #eff6fc; border-color: #cde0f5; border-left-color: #0078d4; }
+.callout-important .callout-title { color: #004e8c; }
 
 .callout-caution   { background: #fde7e9; border-color: #f8bdc0; border-left-color: #d13438; }
 .callout-caution   .callout-title { color: #a4262c; }
@@ -565,6 +567,172 @@ body {
 }
 
 .welcome-instructions p:last-child { margin-bottom: 0; }
+
+.welcome-local {
+  color: #107c10;
+  background: #e6f5e6;
+  border: 1px solid #b8deb8;
+  border-radius: 4px;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem !important;
+  margin-top: 0.75rem;
+}
+
+/* ── Header: separator + Browse button ──────────────────── */
+
+.header-sep {
+  width: 1px;
+  height: 20px;
+  background: rgba(255,255,255,0.2);
+  flex-shrink: 0;
+}
+
+.browse-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  height: 32px;
+  padding: 0 0.875rem;
+  background: transparent;
+  color: rgba(255,255,255,0.85);
+  border: 1px solid rgba(255,255,255,0.25);
+  border-radius: 2px;
+  font-family: var(--font-ui);
+  font-size: 0.875rem;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.browse-btn svg { width: 15px; height: 15px; flex-shrink: 0; }
+.browse-btn:hover  { background: rgba(255,255,255,0.1); border-color: rgba(255,255,255,0.45); color: #fff; }
+.browse-btn:active { background: rgba(255,255,255,0.15); }
+
+/* ── Sidebar tabs ────────────────────────────────────────── */
+
+.sidebar-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--color-border);
+  margin-bottom: 0.5rem;
+}
+
+.sidebar-tab {
+  flex: 1;
+  padding: 0.5rem 0.35rem;
+  border: none;
+  border-bottom: 2px solid transparent;
+  background: none;
+  font-family: var(--font-ui);
+  font-size: 0.8125rem;
+  color: var(--color-muted);
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+  white-space: nowrap;
+}
+.sidebar-tab[aria-selected="true"]              { color: var(--color-link); border-bottom-color: var(--color-link); font-weight: 600; }
+.sidebar-tab:hover:not([aria-selected="true"])  { color: var(--color-text); }
+
+/* ── File tree ───────────────────────────────────────────── */
+
+.ft-root-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 0.5rem 0.75rem;
+  gap: 0.5rem;
+}
+
+.ft-root-name {
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: var(--color-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.local-badge {
+  font-size: 0.6875rem;
+  color: #107c10;
+  background: #e6f5e6;
+  border: 1px solid #b8deb8;
+  border-radius: 20px;
+  padding: 0.1em 0.5em;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.file-tree,
+.file-tree ul { list-style: none; padding: 0; margin: 0; }
+.file-tree ul  { padding-left: 1rem; }
+
+.ft-dir > .ft-dir-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  width: 100%;
+  padding: 0.3rem 0.5rem;
+  border: none;
+  background: none;
+  text-align: left;
+  font-family: var(--font-ui);
+  font-size: 0.875rem;
+  color: var(--color-text);
+  cursor: pointer;
+  border-radius: 3px;
+  transition: background 0.1s;
+}
+.ft-dir > .ft-dir-toggle:hover { background: var(--color-bg-alt); }
+
+.ft-chevron {
+  display: inline-block;
+  font-size: 0.75rem;
+  color: var(--color-muted);
+  transition: transform 0.15s;
+  width: 12px;
+  text-align: center;
+  flex-shrink: 0;
+}
+.ft-dir.expanded > .ft-dir-toggle .ft-chevron { transform: rotate(90deg); }
+
+.ft-dir-name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.ft-file > .ft-file-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  width: 100%;
+  padding: 0.3rem 0.5rem;
+  border: none;
+  border-left: 2px solid transparent;
+  background: none;
+  text-align: left;
+  font-family: var(--font-ui);
+  font-size: 0.875rem;
+  color: var(--color-muted);
+  cursor: pointer;
+  border-radius: 3px;
+  transition: background 0.1s, color 0.1s;
+}
+.ft-file > .ft-file-btn:hover              { background: #f0f8ff; color: var(--color-link); }
+.ft-file.active > .ft-file-btn             { background: #eff6fc; color: var(--color-link); font-weight: 600; border-left-color: var(--color-link); }
+
+.ft-file-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* ── Image border (mx-imgBorder) ─────────────────────────── */
+
+.ms-article .mx-imgBorder {
+  display: block;
+  margin: 0.75rem 0;
+}
+.ms-article .mx-imgBorder img,
+.ms-article .mx-imgBorder > img {
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+  max-width: 100%;
+  height: auto;
+}
 
 /* ── Responsive ──────────────────────────────────────────── */
 

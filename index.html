@@ -36,6 +36,14 @@
       >
       <button id="loadBtn" class="load-btn" type="button">Preview</button>
     </div>
+    <div class="header-sep" aria-hidden="true"></div>
+    <button id="browseBtn" class="browse-btn" type="button" title="Open a local folder of markdown files">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" focusable="false">
+        <path d="M2 6a2 2 0 012-2h4l2 2h6a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"/>
+      </svg>
+      Browse local
+    </button>
+    <input type="file" id="folderInput" style="display:none" webkitdirectory>
   </header>
 
   <!-- ── Breadcrumb ─────────────────────────────────────────── -->
@@ -50,12 +58,28 @@
   <!-- ── Page layout ───────────────────────────────────────── -->
   <div class="ms-layout">
 
-    <!-- Left sidebar / TOC -->
-    <aside class="ms-sidebar" id="sidebar" hidden aria-label="Table of contents">
-      <nav class="ms-toc">
-        <div class="toc-heading">In this article</div>
-        <ul id="toc-list"></ul>
-      </nav>
+    <!-- Left sidebar -->
+    <aside class="ms-sidebar" id="sidebar" hidden>
+      <!-- Tab bar: visible only when a local folder is loaded -->
+      <div class="sidebar-tabs" id="sidebar-tabs" hidden>
+        <button class="sidebar-tab" id="tab-files" aria-selected="false">📁 Files</button>
+        <button class="sidebar-tab" id="tab-toc"   aria-selected="true">In this article</button>
+      </div>
+      <!-- File tree panel -->
+      <div id="panel-files" class="sidebar-panel" hidden>
+        <div class="ft-root-header">
+          <span class="ft-root-name" id="folder-name-el"></span>
+          <span class="local-badge" title="Files are processed locally and never uploaded">🔒 Local</span>
+        </div>
+        <ul class="file-tree" id="file-tree-el" aria-label="Repository files"></ul>
+      </div>
+      <!-- TOC panel -->
+      <div id="panel-toc" class="sidebar-panel">
+        <nav class="ms-toc">
+          <div class="toc-heading">In this article</div>
+          <ul id="toc-list"></ul>
+        </nav>
+      </div>
     </aside>
 
     <!-- Main content -->
@@ -74,13 +98,14 @@
             <h1>Doc Preview</h1>
             <p class="welcome-sub">Preview GitHub markdown files styled like Microsoft Learn.</p>
             <div class="welcome-instructions">
-              <p>Paste a URL in the bar above and click <strong>Preview</strong>.</p>
-              <p>Supported URL formats:</p>
+              <p>Paste a GitHub URL above and click <strong>Preview</strong>, or use <strong>Browse local</strong> to open a folder from your computer.</p>
+              <p>Supported GitHub URL formats:</p>
               <ul>
                 <li><code>https://github.com/<em>org</em>/<em>repo</em>/blob/<em>branch</em>/<em>path/to/file.md</em></code></li>
                 <li><code>https://raw.githubusercontent.com/<em>org</em>/<em>repo</em>/<em>branch</em>/<em>path/to/file.md</em></code></li>
               </ul>
-              <p>The preview URL is shareable — anyone with the link will see the same document.</p>
+              <p class="welcome-local">🔒 <strong>Local files never leave your device</strong> — all rendering happens in your browser, nothing is uploaded.</p>
+              <p>GitHub preview URLs are shareable — anyone with the link will see the same document.</p>
             </div>
           </div>
         </div>
