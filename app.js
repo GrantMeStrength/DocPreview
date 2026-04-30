@@ -27,6 +27,7 @@
   let localFolderLoaded = false;
   let activeFileItem    = null;
   let localFileMap      = new Map(); // normalised relPath → File
+  let loadedRootName    = '';        // name of the folder the user selected
   let blobUrls          = [];        // blob: URLs to revoke on next render
   let fetchController   = null;      // current AbortController for fetch
   let renderGen         = 0;         // increments on every load; stale FileReader results ignored
@@ -36,11 +37,44 @@
   // Cache the initial welcome-screen HTML so back-navigation can restore it
   const welcomeHtml = contentArea.innerHTML;
 
+  // ── Callout metadata ────────────────────────────────────────
+  const CALLOUT_META = {
+    NOTE:      { title: 'Note',      icon: 'ℹ️'  },
+    TIP:       { title: 'Tip',       icon: '💡'  },
+    WARNING:   { title: 'Warning',   icon: '⚠️'  },
+    IMPORTANT: { title: 'Important', icon: '❗'  },
+    CAUTION:   { title: 'Caution',   icon: '🔴' },
+  };
+
   // ── Configure marked ────────────────────────────────────────
   marked.use({
     gfm: true,
     breaks: false,
     renderer: {
+      // Render blockquote callouts (> [!NOTE] …) as styled callout divs
+      blockquote({ tokens }) {
+        const firstPara = tokens.find(t => t.type === 'paragraph');
+        if (firstPara) {
+          const rawText = firstPara.text ?? '';
+          const match   = rawText.match(/^\[!(NOTE|TIP|WARNING|IMPORTANT|CAUTION)\]\s*/i);
+          if (match) {
+            const type       = match[1].toUpperCase();
+            const meta       = CALLOUT_META[type];
+            const inlineText = rawText.slice(match[0].length).trim();
+            const bodyTokens = tokens.filter(t => t !== firstPara);
+            const bodyHtml   = this.parser.parse(bodyTokens);
+
+            let html = `<div class="callout callout-${type.toLowerCase()}">`;
+            html += `<p class="callout-title" aria-label="${meta.title}">${meta.icon} ${meta.title}</p>`;
+            if (inlineText) html += `<p>${marked.parseInline(inlineText)}</p>`;
+            html += bodyHtml;
+            html += `</div>\n`;
+            return html;
+          }
+        }
+        const body = this.parser.parse(tokens);
+        return `<blockquote>\n${body}</blockquote>\n`;
+      },
       // Syntax-highlight fenced code blocks and add data-lang label
       code({ text, lang }) {
         const safeText = text ?? '';
@@ -143,69 +177,15 @@
     return (md ?? '').replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n/, '');
   }
 
-  // ── Callout post-processor ──────────────────────────────────
-  const CALLOUT_META = {
-    NOTE:      { title: 'Note',      icon: 'ℹ️'  },
-    TIP:       { title: 'Tip',       icon: '💡'  },
-    WARNING:   { title: 'Warning',   icon: '⚠️'  },
-    IMPORTANT: { title: 'Important', icon: '❗'  },
-    CAUTION:   { title: 'Caution',   icon: '🔴' },
-  };
-
   /**
-   * Turn  <blockquote><p>[!NOTE] …</p>…</blockquote>
-   * into  <div class="callout callout-note">…</div>
+   * Detect mis-formatted callouts written without a blockquote ">" prefix
+   * and replace them with an authoring-error notice.
+   * (Correctly formatted callouts are handled by the marked blockquote renderer.)
    */
   function postProcessCallouts(container) {
-    // ── Correctly formatted: > [!NOTE] inside a blockquote ──────
-    container.querySelectorAll('blockquote').forEach(bq => {
-      const firstP = bq.querySelector('p:first-child');
-      if (!firstP) return;
-
-      const match = firstP.textContent.trim().match(/^\[!(NOTE|TIP|WARNING|IMPORTANT|CAUTION)\]/i);
-      if (!match) return;
-
-      const type = match[1].toUpperCase();
-      const meta = CALLOUT_META[type];
-
-      const div = document.createElement('div');
-      div.className = `callout callout-${type.toLowerCase()}`;
-
-      const titleEl = document.createElement('p');
-      titleEl.className = 'callout-title';
-      titleEl.setAttribute('aria-label', meta.title);
-      titleEl.innerHTML = `${meta.icon} ${meta.title}`;
-      div.appendChild(titleEl);
-
-      // Strip the [!TYPE] token from firstP
-      const strippedHTML = firstP.innerHTML
-        .replace(/^\[!(NOTE|TIP|WARNING|IMPORTANT|CAUTION)\](<br\s*\/?>|\s)*/i, '')
-        .trim();
-
-      // Use identity check (not index) — whitespace text nodes can precede firstP
-      let pastFirstP = false;
-      Array.from(bq.childNodes).forEach(child => {
-        if (child === firstP) {
-          pastFirstP = true;
-          // Replace [!TYPE] paragraph with inline text that followed the token
-          if (strippedHTML) {
-            const newP = document.createElement('p');
-            newP.innerHTML = strippedHTML;
-            div.appendChild(newP);
-          }
-          return; // skip firstP itself — don't move it to the callout div
-        }
-        if (!pastFirstP) return; // skip leading whitespace text nodes
-        div.appendChild(child);
-      });
-
-      bq.replaceWith(div);
-    });
-
-    // ── Mis-formatted: [!NOTE] outside a blockquote (missing ">") ──
     const CALLOUT_RE = /^\[!(NOTE|TIP|WARNING|IMPORTANT|CAUTION)\]/i;
     container.querySelectorAll('p').forEach(p => {
-      // Skip paragraphs already inside a processed callout div
+      // Skip paragraphs already inside a rendered callout div
       if (p.closest('.callout')) return;
       const match = p.textContent.trim().match(CALLOUT_RE);
       if (!match) return;
@@ -556,25 +536,58 @@
       return span;
     }
 
-    const resolved = resolveLocalPath(cleanHref, baseDir);
-    const found    = findLocalFile(resolved);
+    // "~/" prefix means repo-root-relative in Learn/DocFX repos — skip baseDir join
+    let resolved;
+    if (cleanHref.startsWith('~/')) {
+      resolved = cleanHref.slice(2);
+    } else {
+      resolved = resolveLocalPath(cleanHref, baseDir);
+      // Strip loadedRootName prefix (case-insensitive). Happens when toc.yml uses
+      // "../<rootFolder>/file.md" paths and the user loaded <rootFolder> directly:
+      // resolveLocalPath produces "<rootFolder>/file.md" but localFileMap keys have
+      // no root prefix.
+      if (loadedRootName) {
+        const prefix = loadedRootName.toLowerCase() + '/';
+        if (resolved.toLowerCase().startsWith(prefix)) {
+          resolved = resolved.slice(loadedRootName.length + 1);
+        }
+      }
+    }
+    const found = findLocalFile(resolved);
 
     if (!found) {
+      // Detect whether the href escapes the loaded folder root via ".." traversal
+      const upCount      = cleanHref.replace(/\\/g, '/').split('/').filter(p => p === '..').length;
+      const baseDirDepth = baseDir ? baseDir.split('/').length : 0;
+      const aboveRoot    = upCount > baseDirDepth;
+
       console.warn('[DocPreview] toc.yml: could not find file for href:', cleanHref, '(resolved:', resolved + ')');
-      // Still render as a link so the TOC is navigable; clicking shows a helpful message
       const a = document.createElement('a');
       a.className = 'toc-nav-link toc-nav-link--missing';
       a.textContent = name;
       a.href = '#';
-      a.title = `File not found in loaded folder: ${cleanHref}`;
+      a.title = aboveRoot
+        ? `Outside loaded folder — load the parent of "${loadedRootName}"`
+        : `File not found in loaded folder: ${cleanHref}`;
       a.addEventListener('click', e => {
         e.preventDefault();
-        contentArea.innerHTML =
-          `<div class="error-state">` +
-          `<h3>File not loaded</h3>` +
-          `<p><code>${escapeHtml(cleanHref)}</code> was referenced in toc.yml but is not in the loaded folder.</p>` +
-          `<p>Try loading the folder that contains this file.</p>` +
-          `</div>`;
+        if (aboveRoot) {
+          contentArea.innerHTML =
+            `<div class="error-state">` +
+            `<h3>File is outside the loaded folder</h3>` +
+            `<p><code>${escapeHtml(cleanHref)}</code> references a file in a parent or sibling folder.</p>` +
+            `<p>To navigate this TOC, load the <strong>parent folder</strong> of ` +
+            `<strong>${escapeHtml(loadedRootName)}</strong> instead of just ` +
+            `<strong>${escapeHtml(loadedRootName)}</strong> itself.</p>` +
+            `</div>`;
+        } else {
+          contentArea.innerHTML =
+            `<div class="error-state">` +
+            `<h3>File not loaded</h3>` +
+            `<p><code>${escapeHtml(cleanHref)}</code> was referenced in toc.yml but is not in the loaded folder.</p>` +
+            `<p>Try loading the folder that contains this file.</p>` +
+            `</div>`;
+        }
         sidebar.hidden = false;
         breadcrumb.hidden = true;
       });
@@ -765,7 +778,26 @@
         ul.className = 'toc-nav-list';
         renderTocYmlItems(parsed, ul, baseDir, 0);
 
+        // Warn if any entries couldn't be resolved (dimmed links)
+        // Count them after rendering so the user knows upfront
         tocNavEl.innerHTML = '';
+
+        const missingLinks = ul.querySelectorAll('.toc-nav-link--missing');
+        if (missingLinks.length > 0) {
+          // Check if any of them escape the loaded root (above-root hrefs)
+          const aboveRootCount = Array.from(missingLinks)
+            .filter(a => a.title.startsWith('Outside loaded folder')).length;
+          if (aboveRootCount > 0) {
+            const banner = document.createElement('p');
+            banner.className = 'toc-warning-banner';
+            banner.innerHTML =
+              `⚠️ ${aboveRootCount} TOC ${aboveRootCount === 1 ? 'entry references a file' : 'entries reference files'} ` +
+              `outside <strong>${escapeHtml(loadedRootName)}</strong>. ` +
+              `Load the <strong>parent folder</strong> of <strong>${escapeHtml(loadedRootName)}</strong> to access them.`;
+            tocNavEl.appendChild(banner);
+          }
+        }
+
         tocNavEl.appendChild(ul);
         tabContents.hidden = false;
         showTab('contents');
@@ -1016,13 +1048,22 @@
     const { files } = folderInput;
     if (!files || files.length === 0) return;
 
+    // Single file selected (some OS/browsers allow picking one file even with
+    // webkitdirectory). webkitRelativePath has no "/" so there's no folder root.
+    const firstRelPath = files[0].webkitRelativePath || '';
+    if (files.length === 1 && !firstRelPath.includes('/')) {
+      loadLocalFile(files[0]);
+      return;
+    }
+
     // Reset toc.yml state from any previous folder
     ++tocGen; // invalidate any in-flight toc FileReader
     tocNavEl.innerHTML = '';
     tabContents.hidden = true;
     activeTocNavLink = null;
 
-    const rootName = files[0].webkitRelativePath.split('/')[0];
+    const rootName = firstRelPath.split('/')[0];
+    loadedRootName = rootName;
     folderNameEl.textContent = rootName;
 
     // Build lookup map: repo-relative path → File (for all file types, for image resolution)

@@ -877,6 +877,17 @@ body {
 .toc-nav-link--missing           { opacity: 0.5; font-style: italic; cursor: pointer; }
 .toc-nav-item > .toc-nav-link   { padding-left: 0.35rem; }
 
+.toc-warning-banner {
+  font-size: 0.78rem;
+  line-height: 1.4;
+  color: #7d5a00;
+  background: #fff8e1;
+  border: 1px solid #f0c040;
+  border-radius: 4px;
+  padding: 0.5rem 0.6rem;
+  margin: 0 0 0.75rem 0;
+}
+
 .toc-nav-label {
   display: block;
   padding: 0.25rem 0.35rem 0.25rem 0;
