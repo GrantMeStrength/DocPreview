@@ -360,6 +360,12 @@
       const a = document.createElement('a');
       a.href = `#${h.id}`;
       a.textContent = h.textContent;
+      // Scroll without touching the URL — prevents popstate from firing
+      // and resetting the page to the welcome screen.
+      a.addEventListener('click', e => {
+        e.preventDefault();
+        document.getElementById(h.id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
       li.appendChild(a);
       tocList.appendChild(li);
     });
