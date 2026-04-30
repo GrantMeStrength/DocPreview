@@ -43,25 +43,27 @@
     renderer: {
       // Syntax-highlight fenced code blocks and add data-lang label
       code({ text, lang }) {
+        const safeText = text ?? '';
         let highlighted;
         let detectedLang = null;
         try {
           if (lang && hljs.getLanguage(lang)) {
-            highlighted  = hljs.highlight(text, { language: lang, ignoreIllegals: true }).value;
+            highlighted  = hljs.highlight(safeText, { language: lang, ignoreIllegals: true }).value;
             detectedLang = lang;
           } else {
-            const result = hljs.highlightAuto(text);
+            const result = hljs.highlightAuto(safeText);
             highlighted  = result.value;
             detectedLang = result.language || null;
           }
         } catch (_) {
-          highlighted = escapeHtml(text);
+          highlighted = escapeHtml(safeText);
         }
         const langAttr = detectedLang ? ` data-lang="${detectedLang}"` : '';
         return `<pre${langAttr}><code class="hljs">${highlighted}</code></pre>\n`;
       },
       // Wrap images in mx-imgBorder span (matches learn.microsoft.com HTML)
       image({ href, title, text }) {
+        if (!href) return `<span class="img-placeholder">[image: ${escapeHtml(text || 'no src')}]</span>`;
         const alt       = text  ? ` alt="${escapeHtml(text)}"` : '';
         const titleAttr = title ? ` title="${escapeHtml(title)}"` : '';
         return `<span class="mx-imgBorder"><img src="${href}"${alt}${titleAttr} loading="lazy"></span>`;
@@ -466,7 +468,7 @@
 
   // ── HTML escape helper ───────────────────────────────────────
   function escapeHtml(str) {
-    return str
+    return String(str ?? '')
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;')
