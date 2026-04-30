@@ -504,7 +504,8 @@ body {
 }
 
 .welcome-inner {
-  max-width: 560px;
+  max-width: 720px;
+  width: 100%;
   text-align: center;
   padding: 2rem;
 }
@@ -559,6 +560,8 @@ body {
   font-family: var(--font-mono);
   font-size: 0.8125rem;
   color: var(--color-text);
+  word-break: break-all;
+  overflow-wrap: anywhere;
 }
 
 .welcome-instructions em {
