@@ -182,16 +182,21 @@
         .replace(/^\[!(NOTE|TIP|WARNING|IMPORTANT|CAUTION)\](<br\s*\/?>|\s)*/i, '')
         .trim();
 
-      Array.from(bq.childNodes).forEach((child, idx) => {
-        if (idx === 0) {
+      // Use identity check (not index) — whitespace text nodes can precede firstP
+      let pastFirstP = false;
+      Array.from(bq.childNodes).forEach(child => {
+        if (child === firstP) {
+          pastFirstP = true;
+          // Replace [!TYPE] paragraph with inline text that followed the token
           if (strippedHTML) {
             const newP = document.createElement('p');
             newP.innerHTML = strippedHTML;
             div.appendChild(newP);
           }
-        } else {
-          div.appendChild(child);
+          return; // skip firstP itself — don't move it to the callout div
         }
+        if (!pastFirstP) return; // skip leading whitespace text nodes
+        div.appendChild(child);
       });
 
       bq.replaceWith(div);
