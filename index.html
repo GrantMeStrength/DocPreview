@@ -64,7 +64,6 @@
       <div class="sidebar-tabs" id="sidebar-tabs" hidden>
         <button class="sidebar-tab" id="tab-contents" aria-selected="false" hidden title="Table of contents from toc.yml">📋 Contents</button>
         <button class="sidebar-tab" id="tab-files" aria-selected="false">📁 Files</button>
-        <button class="sidebar-tab" id="tab-toc"   aria-selected="true" title="In this article">In this article</button>
       </div>
       <!-- Contents panel (populated from toc.yml when present) -->
       <div id="panel-contents" class="sidebar-panel" hidden>
@@ -77,13 +76,6 @@
           <span class="local-badge" title="Files are processed locally and never uploaded">🔒 Local</span>
         </div>
         <ul class="file-tree" id="file-tree-el" aria-label="Repository files"></ul>
-      </div>
-      <!-- TOC panel -->
-      <div id="panel-toc" class="sidebar-panel">
-        <nav class="ms-toc">
-          <div class="toc-heading">In this article</div>
-          <ul id="toc-list"></ul>
-        </nav>
       </div>
     </aside>
 
@@ -118,6 +110,14 @@
 
       </article>
     </main>
+
+    <!-- Right: In this article -->
+    <aside class="ms-toc-sidebar" id="toc-sidebar" hidden>
+      <nav class="ms-toc">
+        <div class="toc-heading">In this article</div>
+        <ul id="toc-list"></ul>
+      </nav>
+    </aside>
 
   </div><!-- /.ms-layout -->
 

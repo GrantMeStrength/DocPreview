@@ -15,10 +15,9 @@
   const sidebarTabs  = document.getElementById('sidebar-tabs');
   const tabContents  = document.getElementById('tab-contents');
   const tabFiles     = document.getElementById('tab-files');
-  const tabToc       = document.getElementById('tab-toc');
   const panelContents = document.getElementById('panel-contents');
   const panelFiles   = document.getElementById('panel-files');
-  const panelToc     = document.getElementById('panel-toc');
+  const tocSidebar   = document.getElementById('toc-sidebar');
   const tocNavEl     = document.getElementById('toc-nav-el');
   const tocList      = document.getElementById('toc-list');
   const fileTreeEl   = document.getElementById('file-tree-el');
@@ -343,7 +342,6 @@
     [
       { id: 'contents', tab: tabContents, panel: panelContents },
       { id: 'files',    tab: tabFiles,    panel: panelFiles    },
-      { id: 'toc',      tab: tabToc,      panel: panelToc      },
     ].forEach(({ id, tab, panel }) => {
       const active = id === name;
       tab.setAttribute('aria-selected', active ? 'true' : 'false');
@@ -372,12 +370,11 @@
 
     if (localFolderLoaded) {
       sidebar.hidden = false;
-      // Auto-switch to 'toc' only when the Contents tab isn't showing
-      // (keep user on toc.yml nav if they have one loaded)
-      if (tocList.children.length > 0 && tabContents.hidden) showTab('toc');
+      // Show right TOC column whenever there are headings
+      tocSidebar.hidden = tocList.children.length === 0;
     } else {
-      sidebar.hidden = tocList.children.length === 0;
-      if (tocList.children.length > 0) showTab('toc');
+      // GitHub URL mode — only the right column is used; left sidebar stays hidden
+      tocSidebar.hidden = tocList.children.length === 0;
     }
   }
 
@@ -774,6 +771,7 @@
 
     contentArea.innerHTML = '<div class="loading-state"><div class="loading-spinner" aria-hidden="true"></div><span>Loading…</span></div>';
     if (!localFolderLoaded) sidebar.hidden = true;
+    tocSidebar.hidden = true;
     breadcrumb.hidden = true;
 
     if (activeFileItem) {
@@ -993,8 +991,7 @@
   });
 
   tabContents.addEventListener('click', () => showTab('contents'));
-  tabFiles.addEventListener('click',    () => showTab('files'));
-  tabToc.addEventListener('click',      () => showTab('toc'));
+  tabFiles.addEventListener(   'click', () => showTab('files'));
 
   // Back / forward navigation
   window.addEventListener('popstate', e => {
@@ -1011,6 +1008,7 @@
       urlInput.value        = '';
       contentArea.innerHTML = welcomeHtml;
       if (!localFolderLoaded) sidebar.hidden = true;
+      tocSidebar.hidden = true;
       breadcrumb.hidden = true;
       document.title    = 'Doc Preview – Microsoft Learn Style';
     }
