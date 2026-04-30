@@ -460,6 +460,20 @@ body {
 .callout-caution   { background: #fde7e9; border-color: #f8bdc0; border-left-color: #d13438; }
 .callout-caution   .callout-title { color: #a4262c; }
 
+/* ── Zone / column layout (:::row::: / :::column:::) ─────── */
+.zone-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+  margin: 1.25rem 0;
+}
+.zone-column {
+  flex: 1;
+  min-width: 200px;
+}
+.zone-column-span-2 { flex: 2; }
+.zone-column-span-3 { flex: 3; }
+
 /* ── Authoring errors (mis-formatted callouts, etc.) ────── */
 .authoring-error {
   background: #fff8e1;

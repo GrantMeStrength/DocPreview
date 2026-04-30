@@ -2,7 +2,7 @@
 (function () {
   'use strict';
 
-  const APP_VERSION = '1.6.0';
+  const APP_VERSION = '1.7.0';
   document.getElementById('app-version').textContent = `v${APP_VERSION}`;
 
   // ── DOM refs ────────────────────────────────────────────────
@@ -121,6 +121,33 @@
    * into standard markdown or HTML that marked.js can handle.
    */
   function preprocessOFM(md) {
+    // :::row::: / :::column::: zone layouts → HTML flexbox divs
+    // Blank lines around opening/closing tags let marked process inner content as markdown
+    {
+      const zoneLines = [];
+      for (const line of md.split('\n')) {
+        const t = line.trim();
+        if (/^:::[ \t]*row[ \t]*:::$/.test(t)) {
+          zoneLines.push('<div class="zone-row">');
+        } else if (/^:::[ \t]*row-end[ \t]*:::$/.test(t)) {
+          zoneLines.push('');
+          zoneLines.push('</div>');
+          zoneLines.push('');
+        } else if (/^:::[ \t]*column-end[ \t]*:::$/.test(t)) {
+          zoneLines.push('');
+          zoneLines.push('</div>');
+        } else if (/^:::[ \t]*column/.test(t)) {
+          const span = /span="(\d+)"/.exec(t)?.[1];
+          const cls  = span ? `zone-column zone-column-span-${span}` : 'zone-column';
+          zoneLines.push(`<div class="${cls}">`);
+          zoneLines.push('');
+        } else {
+          zoneLines.push(line);
+        }
+      }
+      md = zoneLines.join('\n');
+    }
+
     // :::image type="content" source="path" alt="text"::: → standard image
     md = md.replace(/^:::\s*image\b([^:]*?):::\s*$/gm, (_, attrs) => {
       const src = /source="([^"]*)"/.exec(attrs)?.[1] ?? '';
