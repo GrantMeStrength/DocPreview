@@ -62,8 +62,13 @@
     <aside class="ms-sidebar" id="sidebar" hidden>
       <!-- Tab bar: visible only when a local folder is loaded -->
       <div class="sidebar-tabs" id="sidebar-tabs" hidden>
+        <button class="sidebar-tab" id="tab-contents" aria-selected="false" hidden title="Table of contents from toc.yml">📋 Contents</button>
         <button class="sidebar-tab" id="tab-files" aria-selected="false">📁 Files</button>
-        <button class="sidebar-tab" id="tab-toc"   aria-selected="true">In this article</button>
+        <button class="sidebar-tab" id="tab-toc"   aria-selected="true" title="In this article">In this article</button>
+      </div>
+      <!-- Contents panel (populated from toc.yml when present) -->
+      <div id="panel-contents" class="sidebar-panel" hidden>
+        <nav class="toc-nav" id="toc-nav-el" aria-label="Table of contents"></nav>
       </div>
       <!-- File tree panel -->
       <div id="panel-files" class="sidebar-panel" hidden>
@@ -119,6 +124,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/marked@9.1.6/marked.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.6/dist/purify.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/js-yaml/4.1.0/js-yaml.min.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

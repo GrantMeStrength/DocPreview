@@ -1,4 +1,4 @@
-/* global marked, hljs, DOMPurify */
+/* global marked, hljs, DOMPurify, jsyaml */
 (function () {
   'use strict';
 
@@ -13,10 +13,13 @@
   const bcFile       = document.getElementById('bc-file');
   const sidebar      = document.getElementById('sidebar');
   const sidebarTabs  = document.getElementById('sidebar-tabs');
+  const tabContents  = document.getElementById('tab-contents');
   const tabFiles     = document.getElementById('tab-files');
   const tabToc       = document.getElementById('tab-toc');
+  const panelContents = document.getElementById('panel-contents');
   const panelFiles   = document.getElementById('panel-files');
   const panelToc     = document.getElementById('panel-toc');
+  const tocNavEl     = document.getElementById('toc-nav-el');
   const tocList      = document.getElementById('toc-list');
   const fileTreeEl   = document.getElementById('file-tree-el');
   const folderNameEl = document.getElementById('folder-name-el');
@@ -28,6 +31,8 @@
   let blobUrls          = [];        // blob: URLs to revoke on next render
   let fetchController   = null;      // current AbortController for fetch
   let renderGen         = 0;         // increments on every load; stale FileReader results ignored
+  let tocGen            = 0;         // increments on every folder load; guards toc.yml FileReader
+  let activeTocNavLink  = null;      // currently highlighted toc.yml nav link
 
   // Cache the initial welcome-screen HTML so back-navigation can restore it
   const welcomeHtml = contentArea.innerHTML;
@@ -134,7 +139,7 @@
   // ── YAML front-matter stripper ──────────────────────────────
   function stripFrontMatter(md) {
     // Only strip if the document starts at byte 0 with "---"
-    return md.replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n/, '');
+    return (md ?? '').replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n/, '');
   }
 
   // ── Callout post-processor ──────────────────────────────────
@@ -335,11 +340,15 @@
 
   // ── Sidebar tab switcher ─────────────────────────────────────
   function showTab(name) {
-    const isFiles = name === 'files';
-    tabFiles.setAttribute('aria-selected', isFiles ? 'true' : 'false');
-    tabToc.setAttribute('aria-selected', isFiles ? 'false' : 'true');
-    panelFiles.hidden = !isFiles;
-    panelToc.hidden   =  isFiles;
+    [
+      { id: 'contents', tab: tabContents, panel: panelContents },
+      { id: 'files',    tab: tabFiles,    panel: panelFiles    },
+      { id: 'toc',      tab: tabToc,      panel: panelToc      },
+    ].forEach(({ id, tab, panel }) => {
+      const active = id === name;
+      tab.setAttribute('aria-selected', active ? 'true' : 'false');
+      panel.hidden = !active;
+    });
   }
 
   // ── TOC builder ─────────────────────────────────────────────
@@ -357,10 +366,12 @@
 
     if (localFolderLoaded) {
       sidebar.hidden = false;
-      // Switch to TOC so the user can navigate headings after opening a file
-      if (tocList.children.length > 0) showTab('toc');
+      // Auto-switch to 'toc' only when the Contents tab isn't showing
+      // (keep user on toc.yml nav if they have one loaded)
+      if (tocList.children.length > 0 && tabContents.hidden) showTab('toc');
     } else {
       sidebar.hidden = tocList.children.length === 0;
+      if (tocList.children.length > 0) showTab('toc');
     }
   }
 
@@ -464,14 +475,255 @@
     });
   }
 
-  // ── Shared render function ───────────────────────────────────
+  // ── toc.yml navigation ───────────────────────────────────────
+
   /**
-   * Parse, sanitize, and render markdown into contentArea.
-   * @param {string}      md           Raw markdown source
-   * @param {string}      displayName  Used in document title if no h1 found
-   * @param {string|null} rawUrl       Source URL (remote) — null for local files
-   * @param {string|null} localRelPath Repo-relative path of local file (null for remote)
+   * Case-insensitive lookup in localFileMap.
+   * Also tries appending ".md" for extension-less hrefs common in toc.yml.
+   * Returns { file, path } or null.
    */
+  function findLocalFile(relPath) {
+    if (!relPath) return null;
+    if (localFileMap.has(relPath)) return { file: localFileMap.get(relPath), path: relPath };
+    const lower = relPath.toLowerCase();
+    for (const [key, file] of localFileMap) {
+      if (key.toLowerCase() === lower) return { file, path: key };
+    }
+    // Retry with .md appended (handles extension-less hrefs)
+    if (!/\.\w+$/.test(relPath)) {
+      const withMd = relPath + '.md';
+      if (localFileMap.has(withMd)) return { file: localFileMap.get(withMd), path: withMd };
+      const withMdLower = withMd.toLowerCase();
+      for (const [key, file] of localFileMap) {
+        if (key.toLowerCase() === withMdLower) return { file, path: key };
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Build a nav link (or a plain span for unresolvable hrefs) for a toc.yml entry.
+   */
+  function buildTocNavLink(name, href, baseDir) {
+    // External URL — open in new tab
+    if (/^https?:\/\//i.test(href)) {
+      const a = document.createElement('a');
+      a.className = 'toc-nav-link';
+      a.textContent = name;
+      a.href = href;
+      a.target = '_blank';
+      a.rel = 'noopener noreferrer';
+      return a;
+    }
+
+    const fragment  = href.match(/(#[^?]*)$/)?.[1] || '';
+    const cleanHref = href.replace(/(#[^?]*)$/, '').trim();
+
+    if (!cleanHref) {
+      const span = document.createElement('span');
+      span.className = 'toc-nav-label';
+      span.textContent = name;
+      return span;
+    }
+
+    const resolved = resolveLocalPath(cleanHref, baseDir);
+    const found    = findLocalFile(resolved);
+
+    if (!found) {
+      // File not in loaded folder — render as non-clickable label
+      const span = document.createElement('span');
+      span.className = 'toc-nav-label';
+      span.textContent = name;
+      return span;
+    }
+
+    const a = document.createElement('a');
+    a.className = 'toc-nav-link';
+    a.textContent = name;
+    a.href = '#';
+    a.dataset.tocPath = found.path;
+    if (fragment) a.dataset.tocFragment = fragment;
+
+    a.addEventListener('click', e => {
+      e.preventDefault();
+      syncTocNavToPath(found.path);
+      loadLocalFile(found.file, fragment || undefined);
+    });
+    return a;
+  }
+
+  /**
+   * Recursively render toc.yml items into a <ul>.
+   * depth 0 = root level (expanded by default); deeper levels follow YAML `expanded` field.
+   */
+  function renderTocYmlItems(items, ulEl, baseDir, depth) {
+    if (!Array.isArray(items)) return;
+    depth = depth || 0;
+
+    items.forEach(item => {
+      if (!item || typeof item !== 'object') return;
+
+      const name    = String(item.name || item.displayName || '').trim();
+      if (!name) return;
+
+      // Prefer `href`; fall back to `topicHref` (used on group nodes in DocFX/Learn)
+      const rawHref    = (item.href != null ? item.href : item.topicHref) || null;
+      const children   = Array.isArray(item.items) && item.items.length > 0 ? item.items : null;
+      const shouldExpand = depth === 0 || item.expanded === true;
+
+      const li = document.createElement('li');
+      li.className = 'toc-nav-item';
+
+      if (children) {
+        li.classList.add('has-children');
+        if (shouldExpand) li.classList.add('expanded');
+
+        const row = document.createElement('div');
+        row.className = 'toc-nav-row';
+
+        const toggleBtn = document.createElement('button');
+        toggleBtn.className = 'toc-nav-toggle';
+        toggleBtn.setAttribute('aria-expanded', String(shouldExpand));
+        toggleBtn.title = shouldExpand ? 'Collapse section' : 'Expand section';
+        toggleBtn.innerHTML = '<span class="toc-nav-chevron" aria-hidden="true">›</span>';
+
+        const childUl = document.createElement('ul');
+        childUl.className = 'toc-nav-children';
+        childUl.hidden = !shouldExpand;
+
+        toggleBtn.addEventListener('click', () => {
+          const expanding = childUl.hidden;
+          childUl.hidden = !expanding;
+          toggleBtn.setAttribute('aria-expanded', String(expanding));
+          toggleBtn.title = expanding ? 'Collapse section' : 'Expand section';
+          li.classList.toggle('expanded', expanding);
+        });
+
+        row.appendChild(toggleBtn);
+
+        if (rawHref) {
+          row.appendChild(buildTocNavLink(name, String(rawHref), baseDir));
+        } else {
+          const span = document.createElement('span');
+          span.className = 'toc-nav-label';
+          span.textContent = name;
+          row.appendChild(span);
+        }
+
+        li.appendChild(row);
+        renderTocYmlItems(item.items, childUl, baseDir, depth + 1);
+        li.appendChild(childUl);
+
+      } else if (rawHref) {
+        li.appendChild(buildTocNavLink(name, String(rawHref), baseDir));
+      } else {
+        const span = document.createElement('span');
+        span.className = 'toc-nav-label';
+        span.textContent = name;
+        li.appendChild(span);
+      }
+
+      ulEl.appendChild(li);
+    });
+  }
+
+  /**
+   * Highlight all toc.yml nav links matching relPath and expand their ancestors.
+   * Clears any previous active state first.
+   */
+  function syncTocNavToPath(relPath) {
+    tocNavEl.querySelectorAll('a.toc-nav-link.active').forEach(a => a.classList.remove('active'));
+    activeTocNavLink = null;
+    if (!relPath) return;
+
+    const lower = relPath.toLowerCase().replace(/\\/g, '/');
+    let firstMatch = null;
+
+    tocNavEl.querySelectorAll('a[data-toc-path]').forEach(a => {
+      if (a.dataset.tocPath.toLowerCase() !== lower) return;
+      a.classList.add('active');
+      if (!firstMatch) firstMatch = a;
+
+      // Expand all ancestor toc-nav-children
+      let node = a.parentElement;
+      while (node && node !== tocNavEl) {
+        if (node.classList.contains('toc-nav-children')) {
+          node.hidden = false;
+          const parentLi = node.parentElement;
+          if (parentLi && parentLi.classList.contains('toc-nav-item')) {
+            parentLi.classList.add('expanded');
+            const toggle = parentLi.querySelector(':scope > .toc-nav-row > .toc-nav-toggle');
+            if (toggle) {
+              toggle.setAttribute('aria-expanded', 'true');
+              toggle.title = 'Collapse section';
+            }
+          }
+        }
+        node = node.parentElement;
+      }
+    });
+
+    activeTocNavLink = firstMatch;
+    if (firstMatch) firstMatch.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }
+
+  /**
+   * Find the most root-level toc.yml in localFileMap, parse it with js-yaml,
+   * and populate the Contents panel. Shows the Contents tab if successful.
+   */
+  function findAndLoadTocYml() {
+    if (typeof jsyaml === 'undefined') return;
+
+    let tocFile = null;
+    let tocPath = null;
+
+    for (const [path, file] of localFileMap) {
+      const name = path.split('/').pop().toLowerCase();
+      if (name === 'toc.yml' || name === 'toc.yaml') {
+        const depth = path.split('/').length;
+        if (tocPath === null || depth < tocPath.split('/').length) {
+          tocFile = file;
+          tocPath = path;
+        }
+      }
+    }
+
+    if (!tocFile) {
+      tabContents.hidden = true;
+      return;
+    }
+
+    const gen     = ++tocGen;
+    const baseDir = tocPath.split('/').slice(0, -1).join('/');
+    const reader  = new FileReader();
+
+    reader.onload = e => {
+      if (gen !== tocGen) return; // superseded by a newer folder load
+      try {
+        let parsed = jsyaml.load(e.target.result);
+        // Handle top-level { items: [...] } wrapper used by some DocFX repos
+        if (parsed && !Array.isArray(parsed) && Array.isArray(parsed.items)) {
+          parsed = parsed.items;
+        }
+        if (!Array.isArray(parsed)) return;
+
+        const ul = document.createElement('ul');
+        ul.className = 'toc-nav-list';
+        renderTocYmlItems(parsed, ul, baseDir, 0);
+
+        tocNavEl.innerHTML = '';
+        tocNavEl.appendChild(ul);
+        tabContents.hidden = false;
+        showTab('contents');
+      } catch (err) {
+        console.warn('Failed to parse toc.yml:', err);
+      }
+    };
+    reader.onerror = () => console.warn('Failed to read toc.yml');
+    reader.readAsText(tocFile);
+  }
+
+  // ── Shared render function ───────────────────────────────────
   function renderContent(md, displayName, rawUrl, localRelPath) {
     const stripped  = preprocessOFM(stripFrontMatter(md));
     const dirtyHtml = marked.parse(stripped);
@@ -577,6 +829,7 @@
       try {
         renderContent(e.target.result, file.name, null, relPath);
         scrollToFragment(fragment);
+        syncTocNavToPath(relPath);
       } catch (err) {
         console.error('renderContent failed:', err);
         contentArea.innerHTML =
@@ -704,6 +957,12 @@
     const { files } = folderInput;
     if (!files || files.length === 0) return;
 
+    // Reset toc.yml state from any previous folder
+    ++tocGen; // invalidate any in-flight toc FileReader
+    tocNavEl.innerHTML = '';
+    tabContents.hidden = true;
+    activeTocNavLink = null;
+
     const rootName = files[0].webkitRelativePath.split('/')[0];
     folderNameEl.textContent = rootName;
 
@@ -721,11 +980,15 @@
     sidebarTabs.hidden = false;
     sidebar.hidden = false;
     showTab('files');
+
+    // Async: shows the Contents tab if a toc.yml is found
+    findAndLoadTocYml();
     // ← do NOT clear folderInput.value here; that invalidates File objects in Safari
   });
 
-  tabFiles.addEventListener('click', () => showTab('files'));
-  tabToc.addEventListener('click',   () => showTab('toc'));
+  tabContents.addEventListener('click', () => showTab('contents'));
+  tabFiles.addEventListener('click',    () => showTab('files'));
+  tabToc.addEventListener('click',      () => showTab('toc'));
 
   // Back / forward navigation
   window.addEventListener('popstate', e => {
