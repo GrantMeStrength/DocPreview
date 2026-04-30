@@ -54,30 +54,36 @@
     gfm: true,
     breaks: false,
     renderer: {
-      // Render blockquote callouts (> [!NOTE] …) as styled callout divs
-      blockquote({ tokens }) {
-        const list = tokens ?? [];
-        const firstPara = list.find(t => t.type === 'paragraph');
-        if (firstPara) {
-          const rawText = firstPara.text ?? '';
-          const match   = rawText.match(/^\[!(NOTE|TIP|WARNING|IMPORTANT|CAUTION)\]\s*/i);
-          if (match) {
-            const type       = match[1].toUpperCase();
-            const meta       = CALLOUT_META[type];
-            const inlineText = rawText.slice(match[0].length).trim();
-            const bodyTokens = list.filter(t => t !== firstPara);
-            const bodyHtml   = this.parser.parse(bodyTokens);
+      // Render blockquote callouts (> [!NOTE] …) as styled callout divs.
+      // Uses `text` (raw blockquote body, always available) instead of
+      // `this.parser.parse(tokens)` which can be undefined in some call paths.
+      blockquote({ tokens, text }) {
+        const safeText = text ?? '';
+        const list     = Array.isArray(tokens) ? tokens : [];
 
-            let html = `<div class="callout callout-${type.toLowerCase()}">`;
-            html += `<p class="callout-title" aria-label="${meta.title}">${meta.icon} ${meta.title}</p>`;
-            if (inlineText) html += `<p>${marked.parseInline(inlineText)}</p>`;
-            html += bodyHtml;
-            html += `</div>\n`;
-            return html;
-          }
+        // Match [!TYPE] on the very first line of the blockquote body
+        const match = safeText.match(
+          /^\[!(NOTE|TIP|WARNING|IMPORTANT|CAUTION)\][ \t]*(.*?)(?:\r?\n|$)([\s\S]*)/i
+        );
+        if (match) {
+          const type       = match[1].toUpperCase();
+          const meta       = CALLOUT_META[type];
+          const inlineText = match[2].trim();
+          const bodyText   = match[3].trim();
+
+          let html = `<div class="callout callout-${type.toLowerCase()}">`;
+          html += `<p class="callout-title" aria-label="${meta.title}">${meta.icon} ${meta.title}</p>`;
+          if (inlineText) html += `<p>${marked.parseInline(inlineText)}</p>`;
+          if (bodyText)   html += marked.parse(bodyText);
+          html += `</div>\n`;
+          return html;
         }
-        const body = this.parser.parse(list);
-        return `<blockquote>\n${body}</blockquote>\n`;
+
+        // Standard blockquote — prefer token-based rendering, fall back to text
+        if (list.length > 0 && this.parser) {
+          return `<blockquote>\n${this.parser.parse(list)}</blockquote>\n`;
+        }
+        return `<blockquote>\n${marked.parse(safeText)}</blockquote>\n`;
       },
       // Syntax-highlight fenced code blocks and add data-lang label
       code({ text, lang }) {
@@ -1087,6 +1093,13 @@
 
     // Async: shows the Contents tab if a toc.yml is found
     findAndLoadTocYml();
+
+    // Auto-load index.md if present at the root of the loaded folder
+    const indexFile = localFileMap.get('index.md')
+                   ?? localFileMap.get('Index.md')
+                   ?? localFileMap.get('INDEX.MD');
+    if (indexFile) loadLocalFile(indexFile);
+
     // ← do NOT clear folderInput.value here; that invalidates File objects in Safari
   });
 
