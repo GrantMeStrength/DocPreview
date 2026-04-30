@@ -176,6 +176,7 @@ body {
   height: calc(100vh - var(--header-h));
   overflow-y: auto;
   overflow-x: hidden;
+  align-self: flex-start;
 }
 
 .toc-heading {
@@ -863,6 +864,13 @@ body {
   text-overflow: ellipsis;
 }
 
+.toc-error {
+  font-size: 0.8rem;
+  color: var(--color-muted);
+  padding: 0.5rem;
+  font-style: italic;
+}
+
 /* ── Right "In this article" sidebar ────────────────────── */
 
 .ms-toc-sidebar {
@@ -875,11 +883,12 @@ body {
   height: calc(100vh - var(--header-h));
   overflow-y: auto;
   overflow-x: hidden;
+  align-self: flex-start;
 }
 
 /* ── Responsive ──────────────────────────────────────────── */
 
-@media (max-width: 900px) {
+@media (max-width: 768px) {
   .ms-sidebar     { display: none !important; }
   .ms-toc-sidebar { display: none !important; }
   .ms-main        { padding: 1.5rem 1.5rem 3rem; }

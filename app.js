@@ -566,7 +566,7 @@
     items.forEach(item => {
       if (!item || typeof item !== 'object') return;
 
-      const name    = String(item.name || item.displayName || '').trim();
+      const name    = String(item.name || item.displayName || item.title || '').trim();
       if (!name) return;
 
       // Prefer `href`; fall back to `topicHref` (used on group nodes in DocFX/Learn)
@@ -670,6 +670,13 @@
     if (firstMatch) firstMatch.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
   }
 
+  /** Show a toc.yml error in the Contents panel and make it visible. */
+  function showTocYmlError(msg) {
+    tocNavEl.innerHTML = `<p class="toc-error">${escapeHtml(msg)}</p>`;
+    tabContents.hidden = false;
+    showTab('contents');
+  }
+
   /**
    * Find the most root-level toc.yml in localFileMap, parse it with js-yaml,
    * and populate the Contents panel. Shows the Contents tab if successful.
@@ -708,7 +715,10 @@
         if (parsed && !Array.isArray(parsed) && Array.isArray(parsed.items)) {
           parsed = parsed.items;
         }
-        if (!Array.isArray(parsed)) return;
+        if (!Array.isArray(parsed)) {
+          showTocYmlError('Unsupported toc.yml format (expected a YAML list)');
+          return;
+        }
 
         const ul = document.createElement('ul');
         ul.className = 'toc-nav-list';
@@ -720,9 +730,13 @@
         showTab('contents');
       } catch (err) {
         console.warn('Failed to parse toc.yml:', err);
+        showTocYmlError('Could not parse toc.yml: ' + err.message);
       }
     };
-    reader.onerror = () => console.warn('Failed to read toc.yml');
+    reader.onerror = () => {
+      if (gen !== tocGen) return;
+      showTocYmlError('Could not read toc.yml');
+    };
     reader.readAsText(tocFile);
   }
 
