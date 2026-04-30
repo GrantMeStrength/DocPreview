@@ -2,6 +2,9 @@
 (function () {
   'use strict';
 
+  const APP_VERSION = '1.5.0';
+  document.getElementById('app-version').textContent = `v${APP_VERSION}`;
+
   // ── DOM refs ────────────────────────────────────────────────
   const urlInput     = document.getElementById('urlInput');
   const loadBtn      = document.getElementById('loadBtn');
@@ -53,7 +56,8 @@
     renderer: {
       // Render blockquote callouts (> [!NOTE] …) as styled callout divs
       blockquote({ tokens }) {
-        const firstPara = tokens.find(t => t.type === 'paragraph');
+        const list = tokens ?? [];
+        const firstPara = list.find(t => t.type === 'paragraph');
         if (firstPara) {
           const rawText = firstPara.text ?? '';
           const match   = rawText.match(/^\[!(NOTE|TIP|WARNING|IMPORTANT|CAUTION)\]\s*/i);
@@ -61,7 +65,7 @@
             const type       = match[1].toUpperCase();
             const meta       = CALLOUT_META[type];
             const inlineText = rawText.slice(match[0].length).trim();
-            const bodyTokens = tokens.filter(t => t !== firstPara);
+            const bodyTokens = list.filter(t => t !== firstPara);
             const bodyHtml   = this.parser.parse(bodyTokens);
 
             let html = `<div class="callout callout-${type.toLowerCase()}">`;
@@ -72,7 +76,7 @@
             return html;
           }
         }
-        const body = this.parser.parse(tokens);
+        const body = this.parser.parse(list);
         return `<blockquote>\n${body}</blockquote>\n`;
       },
       // Syntax-highlight fenced code blocks and add data-lang label

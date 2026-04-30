@@ -559,6 +559,14 @@ body {
   margin-bottom: 2rem;
 }
 
+.welcome-version {
+  font-size: 0.85rem;
+  font-weight: 400;
+  color: var(--color-muted);
+  vertical-align: middle;
+  margin-left: 0.4rem;
+}
+
 .welcome-instructions {
   background: var(--color-bg-alt);
   border-radius: 6px;
