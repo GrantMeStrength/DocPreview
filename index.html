@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Doc Preview – Microsoft Learn Style</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+  <!-- ── Header ──────────────────────────────────────────────── -->
+  <header class="ms-header">
+    <div class="ms-brand" aria-label="Microsoft Learn">
+      <svg class="ms-logo-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 21 21" aria-hidden="true" focusable="false">
+        <rect x="0"  y="0"  width="10" height="10" fill="#f25022"/>
+        <rect x="11" y="0"  width="10" height="10" fill="#7fba00"/>
+        <rect x="0"  y="11" width="10" height="10" fill="#00a4ef"/>
+        <rect x="11" y="11" width="10" height="10" fill="#ffb900"/>
+      </svg>
+      <span class="ms-logo-text">Microsoft</span>
+      <span class="ms-logo-sep" aria-hidden="true">|</span>
+      <span class="ms-logo-product">Learn</span>
+    </div>
+
+    <div class="url-bar" role="search">
+      <label for="urlInput" class="sr-only">GitHub markdown URL</label>
+      <input
+        type="url"
+        id="urlInput"
+        class="url-input"
+        placeholder="Paste a GitHub markdown URL to preview…"
+        autocomplete="off"
+        spellcheck="false"
+        aria-label="GitHub markdown URL"
+      >
+      <button id="loadBtn" class="load-btn" type="button">Preview</button>
+    </div>
+  </header>
+
+  <!-- ── Breadcrumb ─────────────────────────────────────────── -->
+  <nav class="ms-breadcrumb" id="breadcrumb" aria-label="Breadcrumb" hidden>
+    <ol>
+      <li><a id="bc-home" href="#">Home</a></li>
+      <li><a id="bc-repo" href="#"></a></li>
+      <li><span id="bc-file" aria-current="page"></span></li>
+    </ol>
+  </nav>
+
+  <!-- ── Page layout ───────────────────────────────────────── -->
+  <div class="ms-layout">
+
+    <!-- Left sidebar / TOC -->
+    <aside class="ms-sidebar" id="sidebar" hidden aria-label="Table of contents">
+      <nav class="ms-toc">
+        <div class="toc-heading">In this article</div>
+        <ul id="toc-list"></ul>
+      </nav>
+    </aside>
+
+    <!-- Main content -->
+    <main class="ms-main" id="main-area">
+      <article class="ms-article" id="content-area">
+
+        <!-- Welcome screen (replaced on load) -->
+        <div class="welcome-screen" id="welcome-screen">
+          <div class="welcome-inner">
+            <svg class="welcome-logo" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 21 21" aria-hidden="true">
+              <rect x="0"  y="0"  width="10" height="10" fill="#f25022"/>
+              <rect x="11" y="0"  width="10" height="10" fill="#7fba00"/>
+              <rect x="0"  y="11" width="10" height="10" fill="#00a4ef"/>
+              <rect x="11" y="11" width="10" height="10" fill="#ffb900"/>
+            </svg>
+            <h1>Doc Preview</h1>
+            <p class="welcome-sub">Preview GitHub markdown files styled like Microsoft Learn.</p>
+            <div class="welcome-instructions">
+              <p>Paste a URL in the bar above and click <strong>Preview</strong>.</p>
+              <p>Supported URL formats:</p>
+              <ul>
+                <li><code>https://github.com/<em>org</em>/<em>repo</em>/blob/<em>branch</em>/<em>path/to/file.md</em></code></li>
+                <li><code>https://raw.githubusercontent.com/<em>org</em>/<em>repo</em>/<em>branch</em>/<em>path/to/file.md</em></code></li>
+              </ul>
+              <p>The preview URL is shareable — anyone with the link will see the same document.</p>
+            </div>
+          </div>
+        </div>
+
+      </article>
+    </main>
+
+  </div><!-- /.ms-layout -->
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/marked@9.1.6/marked.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.6/dist/purify.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
