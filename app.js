@@ -574,8 +574,17 @@
     const reader = new FileReader();
     reader.onload = e => {
       if (gen !== renderGen) return; // superseded by a newer load
-      renderContent(e.target.result, file.name, null, relPath);
-      scrollToFragment(fragment);
+      try {
+        renderContent(e.target.result, file.name, null, relPath);
+        scrollToFragment(fragment);
+      } catch (err) {
+        console.error('renderContent failed:', err);
+        contentArea.innerHTML =
+          `<div class="error-state">` +
+          `<h3>Render error</h3>` +
+          `<p>${escapeHtml(String(err))}</p>` +
+          `</div>`;
+      }
     };
     reader.onerror = () => {
       if (gen !== renderGen) return;
@@ -686,7 +695,10 @@
     if (e.key === 'Enter') loadMarkdown(urlInput.value, true);
   });
 
-  browseBtn.addEventListener('click', () => folderInput.click());
+  browseBtn.addEventListener('click', () => {
+    folderInput.value = ''; // reset BEFORE opening so re-selecting same folder works
+    folderInput.click();    // and File objects from previous selection stay valid
+  });
 
   folderInput.addEventListener('change', () => {
     const { files } = folderInput;
@@ -709,8 +721,7 @@
     sidebarTabs.hidden = false;
     sidebar.hidden = false;
     showTab('files');
-
-    folderInput.value = ''; // allow re-opening the same folder
+    // ← do NOT clear folderInput.value here; that invalidates File objects in Safari
   });
 
   tabFiles.addEventListener('click', () => showTab('files'));
