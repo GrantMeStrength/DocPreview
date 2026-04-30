@@ -846,6 +846,7 @@ body {
 }
 .toc-nav-link:hover              { color: var(--color-link); }
 .toc-nav-link.active             { color: var(--color-link); font-weight: 600; }
+.toc-nav-link--missing           { opacity: 0.5; font-style: italic; cursor: pointer; }
 .toc-nav-item > .toc-nav-link   { padding-left: 0.35rem; }
 
 .toc-nav-label {

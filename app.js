@@ -487,18 +487,18 @@
    */
   function findLocalFile(relPath) {
     if (!relPath) return null;
-    if (localFileMap.has(relPath)) return { file: localFileMap.get(relPath), path: relPath };
-    const lower = relPath.toLowerCase();
-    for (const [key, file] of localFileMap) {
-      if (key.toLowerCase() === lower) return { file, path: key };
-    }
-    // Retry with .md appended (handles extension-less hrefs)
+    const candidates = [relPath];
+    // Extension-less hrefs: try appending .md
     if (!/\.\w+$/.test(relPath)) {
-      const withMd = relPath + '.md';
-      if (localFileMap.has(withMd)) return { file: localFileMap.get(withMd), path: withMd };
-      const withMdLower = withMd.toLowerCase();
+      candidates.push(relPath + '.md');
+      // Directory-style hrefs (e.g. "overview" or "overview/"): try index.md inside
+      candidates.push(relPath + '/index.md');
+    }
+    for (const candidate of candidates) {
+      if (localFileMap.has(candidate)) return { file: localFileMap.get(candidate), path: candidate };
+      const lower = candidate.toLowerCase();
       for (const [key, file] of localFileMap) {
-        if (key.toLowerCase() === withMdLower) return { file, path: key };
+        if (key.toLowerCase() === lower) return { file, path: key };
       }
     }
     return null;
@@ -533,11 +533,25 @@
     const found    = findLocalFile(resolved);
 
     if (!found) {
-      // File not in loaded folder — render as non-clickable label
-      const span = document.createElement('span');
-      span.className = 'toc-nav-label';
-      span.textContent = name;
-      return span;
+      console.warn('[DocPreview] toc.yml: could not find file for href:', cleanHref, '(resolved:', resolved + ')');
+      // Still render as a link so the TOC is navigable; clicking shows a helpful message
+      const a = document.createElement('a');
+      a.className = 'toc-nav-link toc-nav-link--missing';
+      a.textContent = name;
+      a.href = '#';
+      a.title = `File not found in loaded folder: ${cleanHref}`;
+      a.addEventListener('click', e => {
+        e.preventDefault();
+        contentArea.innerHTML =
+          `<div class="error-state">` +
+          `<h3>File not loaded</h3>` +
+          `<p><code>${escapeHtml(cleanHref)}</code> was referenced in toc.yml but is not in the loaded folder.</p>` +
+          `<p>Try loading the folder that contains this file.</p>` +
+          `</div>`;
+        sidebar.hidden = false;
+        breadcrumb.hidden = true;
+      });
+      return a;
     }
 
     const a = document.createElement('a');
