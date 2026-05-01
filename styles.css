@@ -474,6 +474,92 @@ body {
 .zone-column-span-2 { flex: 2; }
 .zone-column-span-3 { flex: 3; }
 
+/* ── Tab groups (:::tab / #### [Label](#tab/id)) ────────── */
+.tab-group {
+  margin: 1.5rem 0;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.tab-list {
+  display: flex;
+  flex-wrap: wrap;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  background: #f5f5f5;
+  border-bottom: 1px solid var(--color-border);
+}
+.tab-list li { margin: 0; padding: 0; }
+.tab-btn {
+  display: block;
+  padding: 0.55rem 1.1rem;
+  font-size: 0.875rem;
+  font-family: inherit;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  color: var(--color-text);
+  transition: border-color 0.15s, color 0.15s;
+  white-space: nowrap;
+}
+.tab-btn:hover { color: var(--color-link); }
+.tab-btn.active {
+  color: var(--color-link);
+  border-bottom-color: var(--color-link);
+  background: #fff;
+}
+.tab-panels { background: #fff; }
+.tab-panel { display: none; padding: 1.25rem 1.5rem; }
+.tab-panel.active { display: block; }
+.tab-panel > :first-child { margin-top: 0; }
+.tab-panel > :last-child  { margin-bottom: 0; }
+
+/* ── Zone pivots (:::zone pivot="...") ──────────────────── */
+.zone-pivot {
+  margin: 1.25rem 0;
+  border: 1px solid #cde0f5;
+  border-radius: 4px;
+  overflow: hidden;
+}
+.zone-pivot-header {
+  background: #eff6fc;
+  padding: 0.45rem 1rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #004e8c;
+  border-bottom: 1px solid #cde0f5;
+}
+.zone-pivot > *:not(.zone-pivot-header) {
+  padding: 0 1rem;
+}
+
+/* ── External code snippet reference (:::code) ──────────── */
+.code-snippet-ref {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding: 0.65rem 1rem;
+  background: #f9f9f9;
+  border: 1px solid var(--color-border);
+  border-left: 3px solid #888;
+  border-radius: 4px;
+  margin: 1rem 0;
+  font-size: 0.8125rem;
+}
+.code-snippet-icon { font-size: 1rem; }
+.code-snippet-name { font-family: var(--font-mono); font-weight: 600; color: #1a1a1a; word-break: break-all; }
+.code-snippet-lang {
+  background: #e0e0e0;
+  padding: 0.1rem 0.45rem;
+  border-radius: 3px;
+  font-size: 0.75rem;
+  color: #444;
+}
+.code-snippet-note { color: #888; font-style: italic; margin-left: auto; }
+
 /* ── Authoring errors (mis-formatted callouts, etc.) ────── */
 .authoring-error {
   background: #fff8e1;

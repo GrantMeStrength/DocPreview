@@ -2,7 +2,7 @@
 (function () {
   'use strict';
 
-  const APP_VERSION = '1.7.0';
+  const APP_VERSION = '1.8.0';
   document.getElementById('app-version').textContent = `v${APP_VERSION}`;
 
   // ── DOM refs ────────────────────────────────────────────────
@@ -35,6 +35,8 @@
   let fetchController   = null;      // current AbortController for fetch
   let renderGen         = 0;         // increments on every load; stale FileReader results ignored
   let tocGen            = 0;         // increments on every folder load; guards toc.yml FileReader
+  let tabGroupStore     = [];        // cleared per render; indexed tab group data for postProcessTabs
+  let tabGroupCounter   = 0;         // increments per processTabGroups call; indexes tabGroupStore
   let activeTocNavLink  = null;      // currently highlighted toc.yml nav link
 
   // Cache the initial welcome-screen HTML so back-navigation can restore it
@@ -115,13 +117,147 @@
     }
   });
 
+  // ── Tab group preprocessor ───────────────────────────────────
+  /**
+   * Convert Learn-style tab groups into placeholder divs and store their
+   * data in tabGroupStore. postProcessTabs() replaces the placeholders with
+   * real DOM after marked + DOMPurify have run.
+   *
+   * Tab syntax:  #### [Label](#tab/id)   (any heading level)
+   * Group ends:  a "---" HR (consumed) or a same/higher non-tab heading.
+   * Requires ≥ 2 consecutive same-level tab headings to form a group.
+   * Fence-aware: ignores markers inside ``` / ~~~ fenced code blocks.
+   */
+  function processTabGroups(md) {
+    const TAB_RE   = /^(#{1,6}) \[(.+?)\]\(#tab\/([^)\s]+)\)\s*$/;
+    const HR_RE    = /^-{3,}\s*$/;
+    const FENCE_RE = /^(`{3,}|~{3,})/;
+
+    const lines = md.split('\n');
+    const out   = [];
+    let   i     = 0;
+
+    while (i < lines.length) {
+      const firstMatch = TAB_RE.exec(lines[i]);
+      if (!firstMatch) { out.push(lines[i++]); continue; }
+
+      // Potential tab group — collect tabs
+      const level    = firstMatch[1].length;
+      const tabs     = [];          // { label, id, panelId, contentLines[] }
+      let   inFence   = false;
+      let   fenceChar = '';
+      let   fenceLen  = 0;
+      let   consumedHR = false;
+
+      inner: while (i < lines.length) {
+        const ln = lines[i];
+
+        if (inFence) {
+          const fm = FENCE_RE.exec(ln.trimStart());
+          if (fm && fm[1][0] === fenceChar && fm[1].length >= fenceLen) inFence = false;
+          if (tabs.length > 0) tabs[tabs.length - 1].contentLines.push(ln);
+          i++; continue;
+        }
+
+        const fm = FENCE_RE.exec(ln.trimStart());
+        if (fm) {
+          inFence = true; fenceChar = fm[1][0]; fenceLen = fm[1].length;
+          if (tabs.length > 0) tabs[tabs.length - 1].contentLines.push(ln);
+          i++; continue;
+        }
+
+        const tm = TAB_RE.exec(ln);
+        if (tm && tm[1].length === level) {
+          tabs.push({ label: tm[2], id: tm[3], contentLines: [] });
+          i++; continue;
+        }
+
+        if (tabs.length > 0) {
+          if (HR_RE.test(ln)) { consumedHR = true; i++; break inner; }
+          const hm = /^(#{1,6}) /.exec(ln);
+          if (hm && hm[1].length <= level) break inner; // not consumed
+        }
+
+        if (tabs.length > 0) tabs[tabs.length - 1].contentLines.push(ln);
+        else out.push(ln); // safety fallback; shouldn't be reached
+        i++;
+      }
+
+      // Need ≥ 2 tabs; otherwise re-emit as plain markdown
+      if (tabs.length < 2) {
+        for (const tab of tabs) {
+          out.push(`${'#'.repeat(level)} [${tab.label}](#tab/${tab.id})`);
+          out.push(...tab.contentLines);
+        }
+        if (consumedHR) out.push('---');
+        continue;
+      }
+
+      // Assign stable panel IDs and store for postProcessTabs
+      const gid     = `tg${++tabGroupCounter}`;
+      const seenIds = Object.create(null);
+      tabs.forEach(tab => {
+        const base  = tab.id.replace(/[^a-z0-9]/gi, '-').toLowerCase();
+        const count = seenIds[base] ?? 0;
+        tab.panelId  = count ? `${gid}-${base}-${count}` : `${gid}-${base}`;
+        seenIds[base] = count + 1;
+      });
+
+      tabGroupStore.push({ tabs });
+      out.push('<div class="tab-group-placeholder"></div>');
+      out.push('');
+    }
+
+    return out.join('\n');
+  }
+
   // ── OFM preprocessor ────────────────────────────────────────
   /**
    * Convert OFM (Open File Markdown) extensions used by learn.microsoft.com
    * into standard markdown or HTML that marked.js can handle.
    */
   function preprocessOFM(md) {
-    // :::row::: / :::column::: zone layouts → HTML flexbox divs
+    // 1. :::no-loc text="...":::  → strip markup, keep the text value
+    md = md.replace(/:::[ \t]*no-loc[ \t]+text="([^"]*)"[ \t]*:::/g, (_, text) => text);
+
+    // 2. <xref:Type?displayProperty=nameWithType>  → `Type.Member` or `Member`
+    md = md.replace(/<xref:([^>?#\s]+)(\?[^>]*)?>/g, (_, typePath, query) => {
+      const parts = typePath.split('.');
+      const display = /nameWithType/i.test(query ?? '') && parts.length >= 2
+        ? parts.slice(-2).join('.')
+        : parts[parts.length - 1];
+      return `\`${display}\``;
+    });
+
+    // 3. :::image ... :::  → standard markdown image (handles both alt= and alt-text=)
+    md = md.replace(/^:::\s*image\b([^:]*?):::\s*$/gm, (_, attrs) => {
+      const src = /source="([^"]*)"/.exec(attrs)?.[1] ?? '';
+      const alt = /alt(?:-text)?="([^"]*)"/.exec(attrs)?.[1] ?? '';
+      return src ? `\n![${alt}](${src})\n` : '';
+    });
+
+    // 4. :::code language="..." source="..." id="...":::  → external-snippet placeholder
+    md = md.replace(/^[ \t]*:::[ \t]*code[ \t]+(.+?):::[ \t]*$/gm, (_, attrs) => {
+      const lang   = /language="([^"]*)"/.exec(attrs)?.[1] ?? '';
+      const source = /source="([^"]*)"/.exec(attrs)?.[1] ?? '';
+      const id     = /\bid="([^"]*)"/.exec(attrs)?.[1] ?? '';
+      const name   = escapeHtml(source || id || 'external snippet');
+      const badge  = lang ? `<span class="code-snippet-lang">${escapeHtml(lang)}</span>` : '';
+      return `\n<div class="code-snippet-ref"><span class="code-snippet-icon">📄</span>` +
+        `<span class="code-snippet-name">${name}</span>${badge}` +
+        `<span class="code-snippet-note">External snippet — not available in preview</span></div>\n`;
+    });
+
+    // 5. :::zone pivot="..." ... :::zone-end  → labeled zone-pivot block
+    md = md.replace(
+      /^[ \t]*:::[ \t]*zone[ \t]+pivot="([^"]*)"[ \t]*\r?\n([\s\S]*?)^[ \t]*:::[ \t]*zone-end[ \t]*(?:::[ \t]*)?\r?\n?/gm,
+      (_, pivots, content) => {
+        const label = escapeHtml(pivots);
+        return `\n<div class="zone-pivot">\n<div class="zone-pivot-header">🔀 Pivot: ${label}</div>\n\n${content.trim()}\n\n</div>\n\n`;
+      }
+    );
+
+    // 6. :::row::: / :::column::: zone layouts → HTML flexbox divs
     // Blank lines around opening/closing tags let marked process inner content as markdown
     {
       const zoneLines = [];
@@ -148,14 +284,10 @@
       md = zoneLines.join('\n');
     }
 
-    // :::image type="content" source="path" alt="text"::: → standard image
-    md = md.replace(/^:::\s*image\b([^:]*?):::\s*$/gm, (_, attrs) => {
-      const src = /source="([^"]*)"/.exec(attrs)?.[1] ?? '';
-      const alt = /alt="([^"]*)"/.exec(attrs)?.[1] ?? '';
-      return src ? `\n![${alt}](${src})\n` : '';
-    });
+    // 7. Tab groups: #### [Label](#tab/id) ... --- → DOM placeholders (built by postProcessTabs)
+    md = processTabGroups(md);
 
-    // [!INCLUDE [text](path)] → strip (file includes can't be resolved)
+    // 8. [!INCLUDE [text](path)] → strip (file includes can't be resolved)
     md = md.replace(/\[!INCLUDE\s*\[[^\]]*\]\([^)]+\)\]/gi, '');
 
     return md;
@@ -397,6 +529,8 @@
   function buildTOC(container) {
     tocList.innerHTML = '';
     container.querySelectorAll('h2, h3, h4').forEach(h => {
+      // Skip headings inside inactive tab panels (hidden, can't scroll to them)
+      if (h.closest('.tab-panel:not(.active)')) return;
       const li = document.createElement('li');
       li.className = `toc-${h.tagName.toLowerCase()}`;
       const a = document.createElement('a');
@@ -449,7 +583,63 @@
     });
   }
 
-  // ── Scroll spy ───────────────────────────────────────────────
+  // ── Tab group post-processor ─────────────────────────────────
+  /**
+   * Replace .tab-group-placeholder divs (emitted by processTabGroups) with
+   * fully rendered tab group DOM. Called after contentArea.innerHTML is set,
+   * so DOMPurify has already sanitized the outer content. Each panel's
+   * content is independently sanitized here.
+   */
+  function postProcessTabs(container) {
+    const placeholders = container.querySelectorAll('.tab-group-placeholder');
+    placeholders.forEach((placeholder, storeIdx) => {
+      const group = tabGroupStore[storeIdx];
+      if (!group) { placeholder.remove(); return; }
+
+      const wrapper = document.createElement('div');
+      wrapper.className = 'tab-group';
+
+      const ul = document.createElement('ul');
+      ul.className = 'tab-list';
+      ul.setAttribute('role', 'tablist');
+
+      const panelsDiv = document.createElement('div');
+      panelsDiv.className = 'tab-panels';
+
+      group.tabs.forEach((tab, tabIdx) => {
+        // Button
+        const li  = document.createElement('li');
+        li.setAttribute('role', 'presentation');
+        const btn = document.createElement('button');
+        btn.className = 'tab-btn' + (tabIdx === 0 ? ' active' : '');
+        btn.dataset.panel = tab.panelId;
+        btn.setAttribute('role', 'tab');
+        btn.setAttribute('aria-selected', tabIdx === 0 ? 'true' : 'false');
+        btn.textContent = tab.label; // textContent auto-escapes
+        li.appendChild(btn);
+        ul.appendChild(li);
+
+        // Panel
+        const panel = document.createElement('div');
+        panel.className = 'tab-panel' + (tabIdx === 0 ? ' active' : '');
+        panel.id = tab.panelId;
+        panel.setAttribute('role', 'tabpanel');
+        const innerMd   = tab.contentLines.join('\n');
+        const innerHtml = DOMPurify.sanitize(
+          marked.parse(innerMd),
+          { ADD_ATTR: ['target', 'rel', 'data-lang', 'loading'] }
+        );
+        panel.innerHTML = innerHtml;
+        panelsDiv.appendChild(panel);
+      });
+
+      wrapper.appendChild(ul);
+      wrapper.appendChild(panelsDiv);
+      placeholder.replaceWith(wrapper);
+    });
+  }
+
+
   let activeObserver = null;
 
   function setupScrollSpy() {
@@ -852,6 +1042,10 @@
 
   // ── Shared render function ───────────────────────────────────
   function renderContent(md, displayName, rawUrl, localRelPath) {
+    // Reset tab group state — processTabGroups populates tabGroupStore during preprocessing
+    tabGroupStore   = [];
+    tabGroupCounter = 0;
+
     const stripped  = preprocessOFM(stripFrontMatter(md));
     const dirtyHtml = marked.parse(stripped);
     const cleanHtml = DOMPurify.sanitize(dirtyHtml, {
@@ -861,6 +1055,7 @@
     contentArea.innerHTML = cleanHtml;
 
     postProcessCallouts(contentArea);
+    postProcessTabs(contentArea);   // replace tab-group-placeholder divs with real tab DOM
     buildHeadingIds(contentArea);
 
     if (rawUrl)       rewriteRelativeUrls(contentArea, rawUrl);
@@ -1132,6 +1327,23 @@
 
   tabContents.addEventListener('click', () => showTab('contents'));
   tabFiles.addEventListener(   'click', () => showTab('files'));
+
+  // Tab group click handler (content-area tabs created by postProcessTabs)
+  contentArea.addEventListener('click', e => {
+    const btn = e.target.closest('.tab-btn');
+    if (!btn) return;
+    const group = btn.closest('.tab-group');
+    if (!group) return;
+    group.querySelectorAll('.tab-btn').forEach(b => {
+      b.classList.remove('active');
+      b.setAttribute('aria-selected', 'false');
+    });
+    group.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    btn.setAttribute('aria-selected', 'true');
+    const panelId = btn.dataset.panel;
+    if (panelId) group.querySelector('#' + CSS.escape(panelId))?.classList.add('active');
+  });
 
   // Back / forward navigation
   window.addEventListener('popstate', e => {
